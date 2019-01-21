@@ -3,10 +3,13 @@ package com.zhiguangwang.supercell;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.http.HttpServer;
+import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+
+import static com.zhiguangwang.supercell.HashtagUtils.*;
 
 public class HashtagVerticle extends AbstractVerticle {
 
@@ -34,25 +37,46 @@ public class HashtagVerticle extends AbstractVerticle {
 
     private Router createRouter() {
         var router = Router.router(vertx);
-        router.get("/hashtag/:hashtag").handler(this::getHiLoFromHashtag);
-        router.get("/id/:id").handler(this::getHashtagFromHilo);
+        router.get("/hashtag/:hashtag").handler(this::parseHashtag);
+        router.get("/hilo/:hilo").handler(this::parseHiLo);
+        router.get("/id/:id").handler(this::parseId);
         return router;
     }
 
-    private void getHiLoFromHashtag(RoutingContext ctx) {
+    private void parseHashtag(RoutingContext ctx) {
         var hashtag = ctx.request().getParam("hashtag");
-        var hiLo = HashtagUtils.getHiLoFromHashtag(hashtag);
-        var hi = hiLo[0];
-        var lo = hiLo[1];
-        ctx.response().end(hi + "-" + lo);
+        var hiLo = getHiLoFromHashtag(hashtag);
+        var id = getLongFromHashtag(hashtag);
+        var json = toJson(hashtag, hiLo, id);
+        ctx.response().end(json.encodePrettily());
     }
 
-    private void getHashtagFromHilo(RoutingContext ctx) {
-        var id = ctx.request().getParam("id");
-        var arr = id.split("-");
+    private void parseHiLo(RoutingContext ctx) {
+        var hiLo = ctx.request().getParam("hilo");
+        var arr = hiLo.split("-");
         var hi = Long.parseLong(arr[0]);
         var lo = Long.parseLong(arr[1]);
-        var hashtag = HashtagUtils.getHashtagFromHiLo(hi, lo);
-        ctx.response().end(hashtag);
+        var hashtag = getHashtagFromHiLo(hi, lo);
+        var id = getLongFromHashtag(hashtag);
+        var json = toJson(hashtag, new long[]{hi, lo}, id);
+        ctx.response().end(json.encodePrettily());
+    }
+
+    private void parseId(RoutingContext ctx) {
+        var idString = ctx.request().getParam("id");
+        var id = Long.parseLong(idString);
+        var hashtag = getHashtagFromLong(id);
+        var hiLo = getHiLoFromHashtag(hashtag);
+        var json = toJson(hashtag, hiLo, id);
+        ctx.response().end(json.encodePrettily());
+    }
+
+    private static JsonObject toJson(String hashtag, long[] hiLo, long id) {
+        var hi = hiLo[0];
+        var lo = hiLo[1];
+        return new JsonObject()
+            .put("hashtag", hashtag)
+            .put("hilo", hi + "-" + lo)
+            .put("id", Long.toString(id));
     }
 }
